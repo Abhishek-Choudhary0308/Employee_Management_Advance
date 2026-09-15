@@ -1,0 +1,144 @@
+# Implementation Plan - Spring Boot REST API (Practical 1 Baseline)
+
+Refactor and upgrade the existing `rest-demo` Spring Boot REST API codebase to a clean, production-minded, modern industry-standard implementation suitable as the reference solution for Practical 1.
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **Spring Boot Version**: Updating Spring Boot starter parent to `3.4.3` (stable 3.x release) for modern Jakarta EE and Bean Validation standard support.
+> - **API Endpoints**: Migrating endpoints from `/employee/{email}` to standard REST resource endpoints under `/api/employees` and adding `GET /api/hello`.
+> - **Database Profile**: Adding `h2` database runtime dependency to enable seamless out-of-the-box in-memory execution and automated testing without requiring a pre-running local MySQL server, while retaining full externalized MySQL configuration support in `application.properties`.
+
+## Proposed Changes
+
+### 1. Build Configuration (`pom.xml`)
+
+#### [MODIFY] [pom.xml](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/pom.xml)
+- Change Spring Boot parent version to `3.4.3`.
+- Replace `spring-boot-starter-webmvc` with `spring-boot-starter-web`.
+- Add `spring-boot-starter-validation` for Jakarta Bean Validation annotations (`@NotBlank`, `@Email`, `@Pattern`, `@Positive`).
+- Add `com.h2database:h2` with `runtime` scope alongside MySQL connector.
+
+---
+
+### 2. Application Configuration (`src/main/resources`)
+
+#### [MODIFY] [application.properties](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/resources/application.properties)
+- Externalize database connection settings.
+- Provide clean H2 default configuration for instant local execution/testing, with documented MySQL connection properties.
+
+---
+
+### 3. Data Model & Domain Layer (`entity` & `repository`)
+
+#### [MODIFY] [Employee.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/entity/Employee.java)
+- Update primary key ID type from `int` to `Long`.
+- Change `@Table` name to `employees`.
+- Add `department` (`String`) and `salary` (`BigDecimal`) fields.
+- Apply selective Lombok annotations (`@Getter`, `@Setter`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Builder`).
+- Include concise architectural comments on selective Lombok usage for JPA entities.
+
+#### [MODIFY] [EmployeeRepository.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/repository/EmployeeRepository.java)
+- Extend `JpaRepository<Employee, Long>`.
+- Add custom query methods for duplicate checks: `existsByEmail`, `existsByMobileNo`, `existsByEmailAndIdNot`, `existsByMobileNoAndIdNot`.
+
+---
+
+### 4. DTO & Mapping Layer (`dto` & `util`)
+
+#### [MODIFY] [EmployeeRequest.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/dto/EmployeeRequest.java)
+- Add fields: `name`, `email`, `mobileNo`, `department`, `salary`, `password`.
+- Add Bean Validation annotations (`@NotBlank`, `@Email`, `@Pattern`, `@NotNull`, `@Positive`).
+
+#### [MODIFY] [EmployeeResponse.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/dto/EmployeeResponse.java)
+- Add fields: `id`, `name`, `email`, `mobileNo`, `department`, `salary`.
+- Keep `password` strictly excluded from API responses.
+
+#### [MODIFY] [EmployeeMapper.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/util/EmployeeMapper.java)
+- Implement explicit manual mapping methods (`toEntity`, `toResponse`, `updateEntityFromRequest`).
+- Add JavaDoc documentation explaining the DTO isolation boundary concept.
+
+---
+
+### 5. Service Layer (`service`)
+
+#### [MODIFY] [EmployeeService.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/service/EmployeeService.java)
+- Define standard CRUD interface: `getAllEmployees()`, `getEmployeeById(Long id)`, `createEmployee(EmployeeRequest request)`, `updateEmployee(Long id, EmployeeRequest request)`, `deleteEmployee(Long id)`.
+
+#### [MODIFY] [EmployeeServiceImpl.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/service/EmployeeServiceImpl.java)
+- Implement CRUD operations with validation check for existing email/mobile numbers.
+- Use explicit Constructor Injection with architectural comments explaining why constructor injection is preferred over field injection.
+- Apply declarative `@Transactional` boundaries (read-only for read operations, active transactions for mutation operations) with JavaDoc comments explaining transaction boundaries.
+- Add SLF4J logging for service lifecycle events.
+
+---
+
+### 6. Controller & Web Layer (`controller`)
+
+#### [NEW] [HelloController.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/controller/HelloController.java)
+- Implement `GET /api/hello` returning a Hello World response map/string.
+
+#### [MODIFY] [EmployeeController.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/controller/EmployeeController.java)
+- Annotate with `@RestController` and `@RequestMapping("/api/employees")`.
+- Implement endpoints:
+  - `GET /api/employees` -> `200 OK`
+  - `GET /api/employees/{id}` -> `200 OK`
+  - `POST /api/employees` -> `201 Created` with `@Valid @RequestBody`
+  - `PUT /api/employees/{id}` -> `200 OK` with `@Valid @RequestBody`
+  - `DELETE /api/employees/{id}` -> `204 No Content`
+- Use constructor injection and maintain a thin-controller architecture.
+
+---
+
+### 7. Exception Handling Layer (`exception`)
+
+#### [NEW] [ResourceNotFoundException.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/exception/ResourceNotFoundException.java)
+- Custom runtime exception for missing entities (e.g. employee ID not found).
+
+#### [NEW] [ResourceAlreadyExistsException.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/exception/ResourceAlreadyExistsException.java)
+- Custom runtime exception for duplicate field constraints (email/mobile already registered).
+
+#### [DELETE] [EmailNotFoundException.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/exception/EmailNotFoundException.java)
+- Replace with generic `ResourceNotFoundException`.
+
+#### [NEW] [ErrorResponse.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/dto/ErrorResponse.java)
+- Standard error response DTO containing timestamp, status, error code, message, path, and field validation errors map.
+
+#### [MODIFY] [GlobalExceptionHandler.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/main/java/com/tyss/restdemo/exception/GlobalExceptionHandler.java)
+- Update existing `@RestControllerAdvice` to handle:
+  - `ResourceNotFoundException` -> `404 Not Found`
+  - `ResourceAlreadyExistsException` -> `409 Conflict`
+  - `MethodArgumentNotValidException` -> `400 Bad Request` (with detailed validation errors)
+  - `Exception` -> `500 Internal Server Error`
+
+---
+
+### 8. Documentation & Testing (`README.md` & `RestDemoApplicationTests.java`)
+
+#### [NEW] [README.md](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/README.md)
+- Complete technical documentation covering: Overview, Technology Stack, Prerequisites, Database Configuration, Running the Application, API Endpoints, Sample JSON Requests & Responses, and Architectural Decisions.
+
+#### [MODIFY] [RestDemoApplicationTests.java](file:///c:/Users/User/Desktop/13th%20July%20JSB/Springboot%20Demo/rest-demo/src/test/java/com/tyss/restdemo/RestDemoApplicationTests.java)
+- Ensure Spring context loads cleanly without DB errors.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+1. Run `.\mvnw clean compile` to verify clean compilation with zero warnings/errors.
+2. Run `.\mvnw test` to verify context loading.
+
+### Manual / Integration Verification
+1. Launch the application: `.\mvnw spring-boot:run`.
+2. Test HTTP endpoints via PowerShell `Invoke-RestMethod` / `curl`:
+   - `GET /api/hello` -> Verify 200 OK response `{"message": "Hello World REST API"}`.
+   - `POST /api/employees` -> Verify 201 Created response and JSON payload for valid employee.
+   - `POST /api/employees` (duplicate email/mobile) -> Verify 409 Conflict error.
+   - `POST /api/employees` (invalid email/blank name) -> Verify 400 Bad Request with validation errors.
+   - `GET /api/employees` -> Verify 200 OK returning list of employees.
+   - `GET /api/employees/1` -> Verify 200 OK returning employee details.
+   - `GET /api/employees/999` -> Verify 404 Not Found error response.
+   - `PUT /api/employees/1` -> Verify 200 OK returning updated employee details.
+   - `DELETE /api/employees/1` -> Verify 204 No Content response.
+   - `GET /api/employees/1` after delete -> Verify 404 Not Found.
